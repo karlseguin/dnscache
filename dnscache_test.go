@@ -15,55 +15,59 @@ func Test_Cache(t *testing.T) {
 }
 
 func (_ *CacheTests) FetchReturnsAndErrorOnInvalidLookup() {
-	ips, err := New(0).Lookup("invalid.viki.io")
+	ips, err := New(0).Lookup("invalid.openmymind.io")
 	Expect(ips).To.Equal(nil)
-	Expect(err.Error()).To.Equal("lookup invalid.viki.io: no such host")
+	Expect(err.Error()).To.Equal("lookup invalid.openmymind.io: no such host")
 }
 
 func (_ *CacheTests) FetchReturnsAListOfIps() {
-	ips, _ := New(0).Lookup("dnscache.go.test.viki.io")
-	assertIps(ips, []string{"1.123.58.13", "31.85.32.110"})
+	ips, _ := New(0).Lookup("go-dnscache.openmymind.io")
+	assertIps(ips, []string{"8.8.8.8", "8.8.4.4"})
 }
 
 func (_ *CacheTests) CallingLookupAddsTheItemToTheCache() {
 	r := New(0)
-	r.Lookup("dnscache.go.test.viki.io")
-	assertIps(r.cache["dnscache.go.test.viki.io"].ips, []string{"1.123.58.13", "31.85.32.110"})
+	r.Lookup("go-dnscache.openmymind.io")
+	assertIps(r.cache["go-dnscache.openmymind.io"].ips, []string{"8.8.8.8", "8.8.4.4"})
 }
 
 func (_ *CacheTests) FetchLoadsValueFromTheCache() {
 	r := New(0)
-	r.cache["invalid.viki.io"] = &value{[]net.IP{net.ParseIP("1.1.2.3")}, time.Now()}
-	ips, _ := r.Fetch("invalid.viki.io")
+	r.cache["invalid.openmymind.io"] = &value{[]net.IP{net.ParseIP("1.1.2.3")}, time.Now()}
+	ips, _ := r.Fetch("invalid.openmymind.io")
 	assertIps(ips, []string{"1.1.2.3"})
 }
 
-func (_ *CacheTests) FetchOneLoadsTheFirstValue() {
+func (_ *CacheTests) FetchOneLoadsAValue() {
 	r := New(0)
-	r.cache["something.viki.io"] = &value{[]net.IP{net.ParseIP("1.1.2.3"), net.ParseIP("100.100.102.103")}, time.Now()}
-	ip, _ := r.FetchOne("something.viki.io")
-	assertIps([]net.IP{ip}, []string{"1.1.2.3"})
+	r.cache["something.openmymind.io"] = &value{[]net.IP{net.ParseIP("1.1.2.3"), net.ParseIP("100.100.102.103")}, time.Now()}
+	ip, _ := r.FetchOne("something.openmymind.io")
+	if ip.String() != "100.100.102.103" && ip.String() != "1.1.2.3" {
+		Fail("expected ip to be one of two ips")
+	}
 }
 
-func (_ *CacheTests) FetchOneStringLoadsTheFirstValue() {
+func (_ *CacheTests) FetchOneStringLoadsAValue() {
 	r := New(0)
-	r.cache["something.viki.io"] = &value{[]net.IP{net.ParseIP("100.100.102.103"), net.ParseIP("100.100.102.104")}, time.Now()}
-	ip, _ := r.FetchOneString("something.viki.io")
-	Expect(ip).To.Equal("100.100.102.103")
+	r.cache["something.openmymind.io"] = &value{[]net.IP{net.ParseIP("100.100.102.103"), net.ParseIP("100.100.102.104")}, time.Now()}
+	ip, _ := r.FetchOneString("something.openmymind.io")
+	if ip != "100.100.102.103" && ip != "100.100.102.104" {
+		Fail("expected ip to be one of two ips")
+	}
 }
 
 func (_ *CacheTests) FetchLoadsTheIpAndCachesIt() {
 	r := New(0)
-	ips, _ := r.Fetch("dnscache.go.test.viki.io")
+	ips, _ := r.Fetch("go-dnscache.openmymind.io")
 	assertIps(ips, []string{"1.123.58.13", "31.85.32.110"})
-	assertIps(r.cache["dnscache.go.test.viki.io"].ips, []string{"1.123.58.13", "31.85.32.110"})
+	assertIps(r.cache["go-dnscache.openmymind.io"].ips, []string{"1.123.58.13", "31.85.32.110"})
 }
 
 func (_ *CacheTests) ItReloadsTheIpsAtAGivenInterval() {
 	r := New(time.Nanosecond)
-	r.cache["dnscache.go.test.viki.io"] = &value{expires: time.Now().Add(-time.Minute)}
+	r.cache["go-dnscache.openmymind.io"] = &value{expires: time.Now().Add(-time.Minute)}
 	r.Refresh()
-	assertIps(r.cache["dnscache.go.test.viki.io"].ips, []string{"1.123.58.13", "31.85.32.110"})
+	assertIps(r.cache["go-dnscache.openmymind.io"].ips, []string{"1.123.58.13", "31.85.32.110"})
 }
 
 func assertIps(actuals []net.IP, expected []string) {

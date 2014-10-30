@@ -20,10 +20,10 @@ resolver := dnscache.New(time.Minute * 5)
 //get an array of net.IP
 ips, _ := resolver.Fetch("openmymind.io")
 
-//get the first net.IP
+//get the one of the address's net.IP
 ip, _ := resolver.FetchOne("openmymind.io")
 
-//get the first net.IP as string
+//get the one of the address's ip as string
 ip, _ := resolver.FetchOneString("openmymind.io")
 ```
 
