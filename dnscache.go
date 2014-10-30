@@ -7,32 +7,52 @@ import (
 	"time"
 )
 
-type Resolver struct {
-	sync.RWMutex
-	cache map[string][]net.IP
+type value struct {
+	ips     []net.IP
+	expires time.Time
 }
 
-func New(refreshRate time.Duration) *Resolver {
+type Resolver struct {
+	sync.RWMutex
+	minTTL     time.Duration
+	defaultTTL time.Duration
+	cache      map[string]*value
+	ttls       map[string]time.Duration
+}
+
+func New(defaultTTL time.Duration) *Resolver {
 	resolver := &Resolver{
-		cache: make(map[string][]net.IP),
+		minTTL:     defaultTTL,
+		defaultTTL: defaultTTL,
+		cache:      make(map[string]*value),
 	}
-	if refreshRate > 0 {
-		go resolver.autoRefresh(refreshRate)
+	if defaultTTL > 0 {
+		go resolver.autoRefresh()
 	}
 	return resolver
 }
 
+// Set a TTL for a specific address, overwriting the defaultTTL
+func (r *Resolver) TTL(address string, ttl time.Duration) {
+	r.ttls[address] = ttl
+	if ttl < r.minTTL {
+		r.minTTL = ttl
+	}
+}
+
+// Get all of the addresses' ips
 func (r *Resolver) Fetch(address string) ([]net.IP, error) {
 	r.RLock()
-	ips, exists := r.cache[address]
+	value, exists := r.cache[address]
 	r.RUnlock()
 	if exists {
-		return ips, nil
+		return value.ips, nil
 	}
 
 	return r.Lookup(address)
 }
 
+// Get one of the addresses' ips
 func (r *Resolver) FetchOne(address string) (net.IP, error) {
 	ips, err := r.Fetch(address)
 	if err != nil || len(ips) == 0 {
@@ -41,6 +61,7 @@ func (r *Resolver) FetchOne(address string) (net.IP, error) {
 	return ips[0], nil
 }
 
+// Get one of the addresses' ips as a string
 func (r *Resolver) FetchOneString(address string) (string, error) {
 	ip, err := r.FetchOne(address)
 	if err != nil || ip == nil {
@@ -49,13 +70,15 @@ func (r *Resolver) FetchOneString(address string) (string, error) {
 	return ip.String(), nil
 }
 
+// Refresh expired items (called automatically by default)
 func (r *Resolver) Refresh() {
-	i := 0
+	now := time.Now()
 	r.RLock()
-	addresses := make([]string, len(r.cache))
-	for key, _ := range r.cache {
-		addresses[i] = key
-		i++
+	addresses := make([]string, 0, len(r.cache))
+	for key, value := range r.cache {
+		if value.expires.Before(now) {
+			addresses = append(addresses, key)
+		}
 	}
 	r.RUnlock()
 
@@ -65,21 +88,27 @@ func (r *Resolver) Refresh() {
 	}
 }
 
+// Lookup an address' ip, circumventing the cache
 func (r *Resolver) Lookup(address string) ([]net.IP, error) {
 	ips, err := net.LookupIP(address)
 	if err != nil {
 		return nil, err
 	}
 
+	ttl, ok := r.ttls[address]
+	if ok == false {
+		ttl = r.defaultTTL
+	}
+	now := time.Now()
 	r.Lock()
-  defer r.Unlock()
-	r.cache[address] = ips
+	defer r.Unlock()
+	r.cache[address] = &value{ips, now.Add(ttl)}
 	return ips, nil
 }
 
-func (r *Resolver) autoRefresh(rate time.Duration) {
+func (r *Resolver) autoRefresh() {
 	for {
-		time.Sleep(rate)
+		time.Sleep(r.minTTL)
 		r.Refresh()
 	}
 }
