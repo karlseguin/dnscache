@@ -26,6 +26,7 @@ func New(defaultTTL time.Duration) *Resolver {
 		minTTL:     defaultTTL,
 		defaultTTL: defaultTTL,
 		cache:      make(map[string]*value),
+		ttls:       make(map[string]time.Duration),
 	}
 	if defaultTTL > 0 {
 		go resolver.autoRefresh()
