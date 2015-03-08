@@ -59,23 +59,27 @@ func (_ *CacheTests) FetchOneStringLoadsAValue() {
 func (_ *CacheTests) FetchLoadsTheIpAndCachesIt() {
 	r := New(0)
 	ips, _ := r.Fetch("go-dnscache.openmymind.io")
-	assertIps(ips, []string{"1.123.58.13", "31.85.32.110"})
-	assertIps(r.cache["go-dnscache.openmymind.io"].ips, []string{"1.123.58.13", "31.85.32.110"})
+	assertIps(ips, []string{"8.8.4.4", "8.8.8.8"})
+	assertIps(r.cache["go-dnscache.openmymind.io"].ips, []string{"8.8.4.4", "8.8.8.8"})
 }
 
 func (_ *CacheTests) ItReloadsTheIpsAtAGivenInterval() {
 	r := New(time.Nanosecond)
 	r.cache["go-dnscache.openmymind.io"] = &value{expires: time.Now().Add(-time.Minute)}
 	r.Refresh()
-	assertIps(r.cache["go-dnscache.openmymind.io"].ips, []string{"1.123.58.13", "31.85.32.110"})
+	assertIps(r.cache["go-dnscache.openmymind.io"].ips, []string{"8.8.4.4", "8.8.8.8"})
 }
 
 func assertIps(actuals []net.IP, expected []string) {
 	Expect(len(actuals)).To.Equal(len(expected))
+	ips := make([]string, len(actuals))
+	for i, ip := range actuals {
+		ips[i] = ip.String()
+	}
+	sort.Strings(ips)
 	sort.Strings(expected)
-	for _, ip := range actuals {
-		if sort.SearchStrings(expected, ip.String()) == -1 {
-			Fail("Got an unexpected ip: %v:", actuals[0])
-		}
+
+	for i, ip := range ips {
+		Expect(ip).To.Equal(expected[i])
 	}
 }

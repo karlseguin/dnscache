@@ -2,10 +2,10 @@
 package dnscache
 
 import (
+	"math/rand"
 	"net"
 	"sync"
 	"time"
-	"math/rand"
 )
 
 type value struct {
