@@ -27,6 +27,9 @@ ip, _ := resolver.FetchOne("openmymind.io")
 ip, _ := resolver.FetchOneString("openmymind.io")
 ```
 
+The above methods can return either an IPv4 or IPv6 address. It's possible to restrict the
+result to an IPv4 address via `FetchV4`, `FetchOneV4` and `FetchOneV4String`.
+
 If you are using an `http.Transport`, you can use this cache by speficifying a
 `Dial` function:
 
@@ -34,9 +37,9 @@ If you are using an `http.Transport`, you can use this cache by speficifying a
 transport := &http.Transport {
   MaxIdleConnsPerHost: 64,
   Dial: func(network string, address string) (net.Conn, error) {
-    separator := strings.LastIndex(address, ":")
-    ip, _ := dnscache.FetchString(address[:separator])
-    return net.Dial("tcp", ip + address[separator:])
+    host, port, _ := net.SplitHostPort(address)
+    ip, _ := runtime.Resolver.FetchOneString(host)
+    return net.Dial(network, net.JoinHostPort(ip, port))
   },
 }
 ```

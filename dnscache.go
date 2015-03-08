@@ -10,6 +10,7 @@ import (
 
 type value struct {
 	ips     []net.IP
+	ipv4s   []net.IP
 	expires time.Time
 }
 
@@ -76,6 +77,47 @@ func (r *Resolver) FetchOneString(address string) (string, error) {
 	return ip.String(), nil
 }
 
+// Get all of the addresses' ips
+func (r *Resolver) FetchV4(address string) ([]net.IP, error) {
+	r.RLock()
+	value, exists := r.cache[address]
+	r.RUnlock()
+	if exists {
+		return value.ipv4s, nil
+	}
+	r.Lookup(address)
+
+	r.RLock()
+	value, exists = r.cache[address]
+	r.RUnlock()
+	if exists {
+		return value.ipv4s, nil
+	}
+	return nil, nil
+}
+
+// Get one of the addresses' ips
+func (r *Resolver) FetchOneV4(address string) (net.IP, error) {
+	ips, err := r.FetchV4(address)
+	l := len(ips)
+	if err != nil || l == 0 {
+		return nil, err
+	}
+	if l == 1 {
+		return ips[0], nil
+	}
+	return ips[rand.Intn(l)], nil
+}
+
+// Get one of the addresses' ips as a string
+func (r *Resolver) FetchOneV4String(address string) (string, error) {
+	ip, err := r.FetchOneV4(address)
+	if err != nil || ip == nil {
+		return "", err
+	}
+	return ip.String(), nil
+}
+
 // Refresh expired items (called automatically by default)
 func (r *Resolver) Refresh() {
 	now := time.Now()
@@ -101,14 +143,25 @@ func (r *Resolver) Lookup(address string) ([]net.IP, error) {
 		return nil, err
 	}
 
+	v4s := make([]net.IP, 0, len(ips))
+	for _, ip := range ips {
+		if ip.To4() != nil {
+			v4s = append(v4s, ip)
+		}
+	}
+
 	ttl, ok := r.ttls[address]
 	if ok == false {
 		ttl = r.defaultTTL
 	}
-	now := time.Now()
+	expires := time.Now().Add(ttl)
 	r.Lock()
-	defer r.Unlock()
-	r.cache[address] = &value{ips, now.Add(ttl)}
+	r.cache[address] = &value{
+		ips:     ips,
+		ipv4s:   v4s,
+		expires: expires,
+	}
+	r.Unlock()
 	return ips, nil
 }
 
