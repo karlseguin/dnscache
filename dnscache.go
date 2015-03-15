@@ -16,6 +16,7 @@ type value struct {
 
 type Resolver struct {
 	sync.RWMutex
+	stop       chan struct{}
 	minTTL     time.Duration
 	defaultTTL time.Duration
 	cache      map[string]*value
@@ -26,6 +27,7 @@ func New(defaultTTL time.Duration) *Resolver {
 	resolver := &Resolver{
 		minTTL:     defaultTTL,
 		defaultTTL: defaultTTL,
+		stop:       make(chan struct{}),
 		cache:      make(map[string]*value),
 		ttls:       make(map[string]time.Duration),
 	}
@@ -165,9 +167,18 @@ func (r *Resolver) Lookup(address string) ([]net.IP, error) {
 	return ips, nil
 }
 
+// Stops the background refresher. Once stopped, it cannot be started again
+func (r *Resolver) Stop() {
+	r.stop <- struct{}{}
+}
+
 func (r *Resolver) autoRefresh() {
 	for {
-		time.Sleep(r.minTTL)
-		r.Refresh()
+		select {
+		case <-r.stop:
+			return
+		case <-time.After(r.minTTL):
+			r.Refresh()
+		}
 	}
 }
